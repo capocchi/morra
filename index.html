@@ -11,16 +11,16 @@
 </head>
 <body>
 
-  <h1>🤚 Morra</h1>
-  <p class="subtitle">Montrez vos doigts à la caméra et annoncez la somme gagnante</p>
+  <h1>Morra</h1>
+  <p class="subtitle">Fade vede i vostri didi e lampate une somma</p>
 
   <div id="scoreboard">
     <div class="score-item">
-      <div class="score-label">Vous</div>
+      <div class="score-label">Voi</div>
       <div class="score-value" id="player-score">0</div>
     </div>
     <div class="score-item">
-      <div class="score-label">Manches</div>
+      <div class="score-label">Mane</div>
       <div class="score-value" id="round-count">0</div>
     </div>
     <div class="score-item">
@@ -35,22 +35,22 @@
     <div class="camera-section">
       <div id="canvas-container"></div>
       <div class="detection-info">
-        Doigts détectés : <span id="detected-fingers">–</span>
+        Diti detetati : <span id="detected-fingers">–</span>
       </div>
-      <div id="status-bar">Chargement du modèle de détection…</div>
+      <div id="status-bar">Modelu di ricuniscienza</div>
     </div>
 
     <!-- Panneau de jeu -->
     <div class="right-panel">
 
       <div class="panel-card">
-        <div class="panel-title">Votre annonce (somme totale)</div>
+        <div class="panel-title">Vostra chjama (somma)</div>
         <div class="announce-buttons" id="announce-buttons"></div>
-        <button class="btn-play" id="btn-play" disabled>Jouer !</button>
+        <button class="btn-play" id="btn-play" disabled>Chjugate !</button>
       </div>
 
       <div class="panel-card">
-        <div class="panel-title">Résultat</div>
+        <div class="panel-title">Resultatu</div>
         <div id="result-box" class="result-box waiting">
           <div class="result-title">–</div>
           <div class="result-detail">Choisissez votre annonce et jouez</div>
@@ -58,29 +58,27 @@
       </div>
 
       <div class="panel-card">
-        <div class="panel-title">Doigts montrés</div>
+        <div class="panel-title">Diti</div>
         <div class="fingers-display">
           <div class="finger-item">
             <div class="finger-num" id="disp-player" style="color:#5bc8f5;">–</div>
-            <div class="finger-label">Vous</div>
+            <div class="finger-label">Voi</div>
           </div>
           <div class="vs-badge">VS</div>
           <div class="finger-item">
             <div class="finger-num" id="disp-computer" style="color:#f56565;">–</div>
-            <div class="finger-label">Ordinateur</div>
+            <div class="finger-label">Ordinator</div>
           </div>
         </div>
       </div>
 
       <div class="panel-card">
         <p class="rules-hint">
-          <strong>Règles :</strong> chaque joueur montre 0–5 doigts et annonce
-          la somme totale des deux mains. Celui dont l'annonce correspond à la
-          vraie somme remporte la manche.
+          <strong>Regula :</strong> Ogni chjucatori fa vede i so diti e lampa una chjama. Quellu chi dice a bona somma, vince !
         </p>
       </div>
 
-      <button class="btn-reset" id="btn-reset">Réinitialiser les scores</button>
+      <button class="btn-reset" id="btn-reset">Ricumenccia</button>
 
     </div>
   </div>

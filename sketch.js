@@ -182,13 +182,17 @@ const sketch = (p) => {
 
     statusEl.textContent = 'Chargement du modèle HandPose…';
 
-    handpose = ml5.handPose(capture, { maxHands: 1 }, () => {
-      statusEl.textContent = '✅ Modèle prêt — montrez votre main !';
-      state.modelReady = true;
-      checkCanPlay();
-    });
+    // ml5.js 1.2.1 : on crée le modèle sans callback, puis on appelle detectLoop
+    handpose = ml5.handPose({ maxHands: 1 });
 
-    handpose.on('predict', (results) => {
+    // detectLoop() tourne en continu et appelle le callback à chaque frame
+    handpose.detectLoop(capture, (results) => {
+      if (!state.modelReady) {
+        statusEl.textContent = '✅ Modèle prêt — montrez votre main !';
+        state.modelReady = true;
+        checkCanPlay();
+      }
+
       if (results && results.length > 0) {
         const hand = results[0];
         keypointsToRender = hand.keypoints || hand.landmarks || [];
