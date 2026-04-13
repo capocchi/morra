@@ -176,38 +176,45 @@ const sketch = (p) => {
     const cnv = p.createCanvas(w, h);
     cnv.parent('canvas-container');
 
-    capture = p.createCapture(p.VIDEO);
+    // On attend que la caméra soit prête avant de charger le modèle
+    capture = p.createCapture(p.VIDEO, () => { initHandpose(); });
     capture.size(w, h);
     capture.hide();
 
-    statusEl.textContent = 'Chargement du modèle HandPose…';
-
-    // ml5.js 1.2.1 : on crée le modèle sans callback, puis on appelle detectLoop
-    handpose = ml5.handPose({ maxHands: 1 });
-
-    // detectLoop() tourne en continu et appelle le callback à chaque frame
-    handpose.detectLoop(capture, (results) => {
-      if (!state.modelReady) {
-        statusEl.textContent = '✅ Modèle prêt — montrez votre main !';
-        state.modelReady = true;
-        checkCanPlay();
-      }
-
-      if (results && results.length > 0) {
-        const hand = results[0];
-        keypointsToRender = hand.keypoints || hand.landmarks || [];
-
-        const fingers = countFingers(keypointsToRender);
-        state.playerFingers = fingers;
-        detectedEl.textContent = fingers;
-      } else {
-        keypointsToRender      = [];
-        state.playerFingers    = null;
-        detectedEl.textContent = '–';
-      }
-      checkCanPlay();
-    });
+    statusEl.textContent = 'Initialisation de la caméra…';
   };
+
+  // async : await garantit que TensorFlow a fini de charger les poids
+  // avant d'appeler detectLoop, évitant "this.model is null"
+  async function initHandpose() {
+    statusEl.textContent = 'Chargement du modèle HandPose…';
+    try {
+      handpose = await ml5.handPose({ maxHands: 1 });
+
+      statusEl.textContent = '✅ Modèle prêt — montrez votre main !';
+      state.modelReady = true;
+      checkCanPlay();
+
+      handpose.detectLoop(capture, (results) => {
+        if (results && results.length > 0) {
+          const hand = results[0];
+          keypointsToRender = hand.keypoints || hand.landmarks || [];
+          const fingers = countFingers(keypointsToRender);
+          state.playerFingers = fingers;
+          detectedEl.textContent = fingers;
+        } else {
+          keypointsToRender      = [];
+          state.playerFingers    = null;
+          detectedEl.textContent = '–';
+        }
+        checkCanPlay();
+      });
+
+    } catch (err) {
+      statusEl.textContent = '❌ Erreur : ' + err.message;
+      console.error('HandPose init error:', err);
+    }
+  }
 
   p.draw = () => {
     p.background(20, 20, 40);
