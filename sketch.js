@@ -309,39 +309,6 @@ function drawMicIndicator() {
 
 // ─── HAND FEEDBACK ────────────────────────────────────────────────────────────
 function drawHandFeedback(hand, count) {
-    // dessiner les connexions entre keypoints
-    let connections = [
-        ["wrist","thumb_cmc"],["thumb_cmc","thumb_mcp"],["thumb_mcp","thumb_ip"],["thumb_ip","thumb_tip"],
-        ["wrist","index_finger_mcp"],["index_finger_mcp","index_finger_pip"],["index_finger_pip","index_finger_dip"],["index_finger_dip","index_finger_tip"],
-        ["wrist","middle_finger_mcp"],["middle_finger_mcp","middle_finger_pip"],["middle_finger_pip","middle_finger_dip"],["middle_finger_dip","middle_finger_tip"],
-        ["wrist","ring_finger_mcp"],["ring_finger_mcp","ring_finger_pip"],["ring_finger_pip","ring_finger_dip"],["ring_finger_dip","ring_finger_tip"],
-        ["wrist","pinky_finger_mcp"],["pinky_finger_mcp","pinky_finger_pip"],["pinky_finger_pip","pinky_finger_dip"],["pinky_finger_dip","pinky_finger_tip"],
-    ];
-
-    stroke(0, 255, 140, 160);
-    strokeWeight(2);
-    for (let c of connections) {
-        let a = getKeypointsByName(hand, c[0]);
-        let b = getKeypointsByName(hand, c[1]);
-        if (a && b) {
-            let ax = map(a.x, 0, 640, 0, width);
-            let ay = map(a.y, 0, 480, 0, height);
-            let bx = map(b.x, 0, 640, 0, width);
-            let by = map(b.y, 0, 480, 0, height);
-            line(ax, ay, bx, by);
-        }
-    }
-
-    // points
-    noStroke();
-    for (let kp of hand.keypoints) {
-        let kx = map(kp.x, 0, 640, 0, width);
-        let ky = map(kp.y, 0, 480, 0, height);
-        fill(0, 255, 140, 200);
-        ellipse(kx, ky, 8, 8);
-    }
-
-    // compteur sur poignet
     let wrist = getKeypointsByName(hand, "wrist");
     if (wrist) {
         let wx = map(wrist.x, 0, 640, 0, width);
