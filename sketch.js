@@ -2,7 +2,6 @@ let videoCapture;
 let handPose;
 let hands = [];
 
-
 let scoreJoueur = 0;
 let scoreOrdi = 0;
 let messageAction = "Appuyez sur ESPACE pour DEMARRER";
@@ -11,8 +10,8 @@ let ordiDoigts = 0;
 let ordiSommeAnnoncee = 0;
 let maSommeAnnoncee = 0;
 
-let jeuEnCours = false; 
-let phaseJeu = "ATTENTE"; 
+let jeuEnCours = false;
+let phaseJeu = "ATTENTE";
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = new SpeechRecognition();
@@ -23,15 +22,16 @@ recognition.interimResults = false;
 const fingerTips = ["index_finger_tip", "middle_finger_tip", "ring_finger_tip", "pinky_finger_tip"];
 const fingerPips = ["index_finger_pip", "middle_finger_pip", "ring_finger_pip", "pinky_finger_pip"];
 
-function preload() {
-    handPose = ml5.handPose({ flipped: true });
-}
-
-function setup() {
+// ✅ PLUS de preload() — on utilise async setup() pour p5.js 2.x
+async function setup() {
     createCanvas(windowWidth, windowHeight);
+    
     videoCapture = createCapture(VIDEO, { flipped: true });
     videoCapture.size(640, 480);
     videoCapture.hide();
+
+    // ✅ await obligatoire avec p5.js 2.x
+    handPose = await ml5.handPose({ flipped: true });
     handPose.detectStart(videoCapture, gotHands);
 
     recognition.onresult = (event) => {
@@ -40,7 +40,7 @@ function setup() {
         if (matches) {
             maSommeAnnoncee = parseInt(matches[0]);
             verifierGagnant();
-        } else if(parole.toLowerCase().includes("zéro")) {
+        } else if (parole.toLowerCase().includes("zéro")) {
             maSommeAnnoncee = 0;
             verifierGagnant();
         }
@@ -50,7 +50,7 @@ function setup() {
 
     recognition.onend = () => {
         if (jeuEnCours && phaseJeu === "RESULTAT") {
-            setTimeout(lancerManche, 2000); 
+            setTimeout(lancerManche, 2000);
         }
     };
 }
@@ -62,7 +62,7 @@ function draw() {
     let mesDoigts = 0;
     if (hands.length > 0) {
         mesDoigts = countFingers(hands[0]);
-        drawHandFeedback(hands[0], mesDoigts, 0);
+        drawHandFeedback(hands[0], mesDoigts);
     }
 
     displayUI(mesDoigts);
@@ -70,8 +70,7 @@ function draw() {
 
 function keyPressed() {
     if (key === ' ') {
-        jeuEnCours = !jeuEnCours; 
-        
+        jeuEnCours = !jeuEnCours;
         if (jeuEnCours) {
             lancerManche();
         } else {
@@ -85,13 +84,10 @@ function keyPressed() {
 
 function lancerManche() {
     if (!jeuEnCours) return;
-
     phaseJeu = "ECOUTE";
     messageAction = "DITES VOTRE SOMME...";
-    
-    ordiDoigts = floor(random(0, 6)); 
+    ordiDoigts = floor(random(0, 6));
     ordiSommeAnnoncee = floor(random(0, 11));
-    
     try { recognition.start(); } catch(e) {}
 }
 
@@ -123,7 +119,7 @@ function displayUI(mesDoigts) {
     fill(0, 180);
     noStroke();
     rect(20, 20, 450, 200, 15);
-    
+
     fill(255);
     textSize(22);
     text("SCORES", 40, 55);
@@ -136,7 +132,7 @@ function displayUI(mesDoigts) {
     textSize(16);
     if (phaseJeu === "ECOUTE") fill("#00CCFF");
     text(messageAction, 40, 140);
-    
+
     if (phaseJeu === "RESULTAT") {
         fill(255);
         textSize(14);
@@ -151,7 +147,7 @@ function displayUI(mesDoigts) {
     fill(255, 150);
     textSize(14);
     text("Doigts : " + mesDoigts + " | Espace pour ON/OFF", 40, height - 30);
-    
+
     if (jeuEnCours && phaseJeu === "ECOUTE") {
         fill("#ff0000");
         ellipse(width - 40, 40, 20, 20);
@@ -174,12 +170,13 @@ function countFingers(hand) {
     return count;
 }
 
-function drawHandFeedback(hand, count, index) {
+function drawHandFeedback(hand, count) {
     let wrist = getKeypointsByName(hand, "wrist");
     if (wrist) {
         fill(0, 255, 0);
         ellipse(wrist.x, wrist.y, 20);
         textSize(20);
+        fill(255);
         text(count, wrist.x + 15, wrist.y);
     }
 }
