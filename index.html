@@ -1,18 +1,89 @@
 <!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Morra — Jeu de doigts</title>
-    <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.js"></script>
-    <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-      canvas { display: block; }
-    </style>
-  </head>
-  <body>
-    <script src="sketch.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeu de la Morra</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js" defer></script>
+  <script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js" defer></script>
+  <script src="morra.js" defer></script>
+</head>
+<body>
+
+  <h1>🤚 Morra</h1>
+  <p class="subtitle">Montrez vos doigts à la caméra et annoncez la somme gagnante</p>
+
+  <div id="scoreboard">
+    <div class="score-item">
+      <div class="score-label">Vous</div>
+      <div class="score-value" id="player-score">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">Manches</div>
+      <div class="score-value" id="round-count">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">Ordi</div>
+      <div class="score-value" id="computer-score">0</div>
+    </div>
+  </div>
+
+  <div class="main-layout">
+
+    <!-- Caméra / canvas p5 -->
+    <div class="camera-section">
+      <div id="canvas-container"></div>
+      <div class="detection-info">
+        Doigts détectés : <span id="detected-fingers">–</span>
+      </div>
+      <div id="status-bar">Chargement du modèle de détection…</div>
+    </div>
+
+    <!-- Panneau de jeu -->
+    <div class="right-panel">
+
+      <div class="panel-card">
+        <div class="panel-title">Votre annonce (somme totale)</div>
+        <div class="announce-buttons" id="announce-buttons"></div>
+        <button class="btn-play" id="btn-play" disabled>Jouer !</button>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-title">Résultat</div>
+        <div id="result-box" class="result-box waiting">
+          <div class="result-title">–</div>
+          <div class="result-detail">Choisissez votre annonce et jouez</div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-title">Doigts montrés</div>
+        <div class="fingers-display">
+          <div class="finger-item">
+            <div class="finger-num" id="disp-player" style="color:#5bc8f5;">–</div>
+            <div class="finger-label">Vous</div>
+          </div>
+          <div class="vs-badge">VS</div>
+          <div class="finger-item">
+            <div class="finger-num" id="disp-computer" style="color:#f56565;">–</div>
+            <div class="finger-label">Ordinateur</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <p class="rules-hint">
+          <strong>Règles :</strong> chaque joueur montre 0–5 doigts et annonce
+          la somme totale des deux mains. Celui dont l'annonce correspond à la
+          vraie somme remporte la manche.
+        </p>
+      </div>
+
+      <button class="btn-reset" id="btn-reset">Réinitialiser les scores</button>
+
+    </div>
+  </div>
+
+</body>
 </html>

@@ -1,186 +1,281 @@
-let videoCapture;
-let handPose;
-let hands = [];
+/* ============================================================
+   morra.js  —  Jeu de la Morra (p5.js 1.11.3 + ml5.js 1.2.1)
+   ============================================================ */
 
-let scoreJoueur = 0;
-let scoreOrdi = 0;
-let messageAction = "Appuyez sur ESPACE pour DEMARRER";
-let messageResultat = "";
-let ordiDoigts = 0;
-let ordiSommeAnnoncee = 0;
-let maSommeAnnoncee = 0;
+// ── État global ──────────────────────────────────────────────────────────────
+const state = {
+  playerFingers:   null,   // doigts détectés par HandPose (0-5)
+  selectedAnnounce: null,  // chiffre annoncé par le joueur (0-10)
+  playerScore:     0,
+  computerScore:   0,
+  rounds:          0,
+  modelReady:      false,
+};
 
-let jeuEnCours = false;
-let phaseJeu = "ATTENTE";
+// ── Raccourcis DOM ────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const recognition = new SpeechRecognition();
-recognition.lang = 'fr-FR';
-recognition.continuous = false;
-recognition.interimResults = false;
+// ── Tableau de scores ─────────────────────────────────────────────────────────
+function updateScoreboard() {
+  $('player-score').textContent   = state.playerScore;
+  $('computer-score').textContent = state.computerScore;
+  $('round-count').textContent    = state.rounds;
+}
 
-const fingerTips = ["index_finger_tip", "middle_finger_tip", "ring_finger_tip", "pinky_finger_tip"];
-const fingerPips = ["index_finger_pip", "middle_finger_pip", "ring_finger_pip", "pinky_finger_pip"];
+// ── Boutons d'annonce (0 à 10) ────────────────────────────────────────────────
+function buildAnnounceButtons() {
+  const container = $('announce-buttons');
+  for (let i = 0; i <= 10; i++) {
+    const btn = document.createElement('button');
+    btn.className      = 'btn-number';
+    btn.textContent    = i;
+    btn.dataset.value  = i;
+    btn.addEventListener('click', () => selectAnnounce(i));
+    container.appendChild(btn);
+  }
+}
 
-// ✅ PLUS de preload() — on utilise async setup() pour p5.js 2.x
-async function setup() {
-    createCanvas(windowWidth, windowHeight);
-    
-    videoCapture = createCapture(VIDEO, { flipped: true });
-    videoCapture.size(640, 480);
-    videoCapture.hide();
+function selectAnnounce(val) {
+  state.selectedAnnounce = val;
+  document.querySelectorAll('.btn-number').forEach(b => {
+    b.classList.toggle('selected', parseInt(b.dataset.value) === val);
+  });
+  checkCanPlay();
+}
 
-    // ✅ await obligatoire avec p5.js 2.x
-    handPose = await ml5.handPose({ flipped: true });
-    handPose.detectStart(videoCapture, gotHands);
+// ── Activation du bouton "Jouer" ──────────────────────────────────────────────
+function checkCanPlay() {
+  $('btn-play').disabled = !(
+    state.modelReady &&
+    state.playerFingers !== null &&
+    state.selectedAnnounce !== null
+  );
+}
 
-    recognition.onresult = (event) => {
-        let parole = event.results[0][0].transcript;
-        let matches = parole.match(/\d+/);
-        if (matches) {
-            maSommeAnnoncee = parseInt(matches[0]);
-            verifierGagnant();
-        } else if (parole.toLowerCase().includes("zéro")) {
-            maSommeAnnoncee = 0;
-            verifierGagnant();
+// ── Comptage des doigts (keypoints HandPose) ──────────────────────────────────
+//  Landmarks : 0=poignet, 4=pouce tip, 2=pouce mcp,
+//              8/6 index, 12/10 majeur, 16/14 annulaire, 20/18 auriculaire
+function countFingers(keypoints) {
+  if (!keypoints || keypoints.length < 21) return 0;
+
+  let count = 0;
+
+  // Pouce : on compare la distance horizontale vs verticale
+  const thumbTip = keypoints[4];
+  const thumbMcp = keypoints[2];
+  if (thumbTip && thumbMcp) {
+    const dx = Math.abs(thumbTip.x - thumbMcp.x);
+    const dy = Math.abs(thumbTip.y - thumbMcp.y);
+    if (dx > dy ? thumbTip.x > thumbMcp.x : thumbTip.y < thumbMcp.y) count++;
+  }
+
+  // 4 autres doigts : tip plus haut (y plus petit) que pip = doigt levé
+  const fingerPairs = [[8, 6], [12, 10], [16, 14], [20, 18]];
+  fingerPairs.forEach(([tip, pip]) => {
+    const tipKp = keypoints[tip];
+    const pipKp = keypoints[pip];
+    if (tipKp && pipKp && tipKp.y < pipKp.y) count++;
+  });
+
+  return count;
+}
+
+// ── Logique d'une manche ──────────────────────────────────────────────────────
+function playRound() {
+  if (state.playerFingers === null || state.selectedAnnounce === null) return;
+
+  const computerFingers  = Math.floor(Math.random() * 6);        // 0-5
+  const computerAnnounce = Math.floor(Math.random() * 11);       // 0-10
+  const realSum          = state.playerFingers + computerFingers;
+
+  const playerCorrect   = state.selectedAnnounce === realSum;
+  const computerCorrect = computerAnnounce       === realSum;
+
+  state.rounds++;
+
+  let outcome, cssClass;
+  if (playerCorrect && !computerCorrect) {
+    state.playerScore++;
+    outcome  = '🎉 Vous gagnez !';
+    cssClass = 'win';
+  } else if (!playerCorrect && computerCorrect) {
+    state.computerScore++;
+    outcome  = "💻 L'ordinateur gagne";
+    cssClass = 'lose';
+  } else if (playerCorrect && computerCorrect) {
+    outcome  = '🤝 Égalité parfaite !';
+    cssClass = 'draw';
+  } else {
+    outcome  = '😶 Personne ne gagne';
+    cssClass = 'draw';
+  }
+
+  updateScoreboard();
+
+  $('disp-player').textContent   = state.playerFingers;
+  $('disp-computer').textContent = computerFingers;
+
+  const box = $('result-box');
+  box.className = 'result-box ' + cssClass;
+  box.innerHTML = `
+    <div class="result-title">${outcome}</div>
+    <div class="result-detail">
+      Somme réelle : <strong>${realSum}</strong> &nbsp;|&nbsp;
+      Votre annonce : <strong>${state.selectedAnnounce}</strong> &nbsp;|&nbsp;
+      Ordi annonce : <strong>${computerAnnounce}</strong>
+    </div>
+  `;
+}
+
+// ── Réinitialisation des scores ───────────────────────────────────────────────
+function resetGame() {
+  state.playerScore      = 0;
+  state.computerScore    = 0;
+  state.rounds           = 0;
+  state.selectedAnnounce = null;
+
+  updateScoreboard();
+  document.querySelectorAll('.btn-number').forEach(b => b.classList.remove('selected'));
+  $('disp-player').textContent   = '–';
+  $('disp-computer').textContent = '–';
+
+  const box = $('result-box');
+  box.className = 'result-box waiting';
+  box.innerHTML = `
+    <div class="result-title">–</div>
+    <div class="result-detail">Choisissez votre annonce et jouez</div>
+  `;
+  $('btn-play').disabled = true;
+}
+
+// ── Sketch p5.js ──────────────────────────────────────────────────────────────
+const sketch = (p) => {
+  let capture;
+  let handpose;
+  let keypointsToRender = [];
+
+  const statusEl   = $('status-bar');
+  const detectedEl = $('detected-fingers');
+
+  // Connexions du squelette de la main (paires d'indices)
+  const CONNECTIONS = [
+    [0,1],[1,2],[2,3],[3,4],       // pouce
+    [0,5],[5,6],[6,7],[7,8],       // index
+    [5,9],[9,10],[10,11],[11,12],  // majeur
+    [9,13],[13,14],[14,15],[15,16],// annulaire
+    [13,17],[17,18],[18,19],[19,20],[0,17] // auriculaire
+  ];
+
+  const TIP_INDICES = new Set([4, 8, 12, 16, 20]);
+
+  p.setup = () => {
+    const container = $('canvas-container');
+    const w = container.offsetWidth || 480;
+    const h = Math.round(w * 0.75);
+
+    const cnv = p.createCanvas(w, h);
+    cnv.parent('canvas-container');
+
+    capture = p.createCapture(p.VIDEO);
+    capture.size(w, h);
+    capture.hide();
+
+    statusEl.textContent = 'Chargement du modèle HandPose…';
+
+    handpose = ml5.handPose(capture, { maxHands: 1 }, () => {
+      statusEl.textContent = '✅ Modèle prêt — montrez votre main !';
+      state.modelReady = true;
+      checkCanPlay();
+    });
+
+    handpose.on('predict', (results) => {
+      if (results && results.length > 0) {
+        const hand = results[0];
+        keypointsToRender = hand.keypoints || hand.landmarks || [];
+
+        const fingers = countFingers(keypointsToRender);
+        state.playerFingers = fingers;
+        detectedEl.textContent = fingers;
+      } else {
+        keypointsToRender      = [];
+        state.playerFingers    = null;
+        detectedEl.textContent = '–';
+      }
+      checkCanPlay();
+    });
+  };
+
+  p.draw = () => {
+    p.background(20, 20, 40);
+
+    // Image caméra en miroir
+    if (capture.width > 0) {
+      p.push();
+      p.translate(p.width, 0);
+      p.scale(-1, 1);
+      p.image(capture, 0, 0, p.width, p.height);
+      p.pop();
+    }
+
+    // Squelette de la main
+    if (keypointsToRender.length > 0) {
+      // Lignes
+      p.stroke(91, 200, 245, 180);
+      p.strokeWeight(2);
+      CONNECTIONS.forEach(([a, b]) => {
+        const ka = keypointsToRender[a];
+        const kb = keypointsToRender[b];
+        if (ka && kb) {
+          p.line(p.width - ka.x, ka.y, p.width - kb.x, kb.y);
         }
-    };
+      });
 
-    recognition.onerror = () => { phaseJeu = "ATTENTE"; };
+      // Points
+      keypointsToRender.forEach((kp, i) => {
+        if (!kp) return;
+        const x = p.width - kp.x;
+        const isTip = TIP_INDICES.has(i);
+        p.noStroke();
+        p.fill(isTip ? '#e0c96e' : '#5bc8f5');
+        p.circle(x, kp.y, isTip ? 10 : 6);
+      });
 
-    recognition.onend = () => {
-        if (jeuEnCours && phaseJeu === "RESULTAT") {
-            setTimeout(lancerManche, 2000);
-        }
-    };
-}
-
-function draw() {
-    background(0);
-    image(videoCapture, 0, 0, width, height);
-
-    let mesDoigts = 0;
-    if (hands.length > 0) {
-        mesDoigts = countFingers(hands[0]);
-        drawHandFeedback(hands[0], mesDoigts);
+      // Badge "nombre de doigts" en haut à droite
+      if (state.playerFingers !== null) {
+        p.noStroke();
+        p.fill(0, 0, 0, 150);
+        p.rect(p.width - 76, 10, 66, 44, 10);
+        p.fill('#e0c96e');
+        p.textSize(28);
+        p.textAlign(p.CENTER, p.CENTER);
+        p.text(state.playerFingers, p.width - 43, 32);
+      }
     }
 
-    displayUI(mesDoigts);
-}
-
-function keyPressed() {
-    if (key === ' ') {
-        jeuEnCours = !jeuEnCours;
-        if (jeuEnCours) {
-            lancerManche();
-        } else {
-            phaseJeu = "ATTENTE";
-            messageAction = "JEU ARRÊTÉ. Espace pour reprendre.";
-            messageResultat = "";
-            try { recognition.stop(); } catch(e) {}
-        }
+    // Message de chargement
+    if (!state.modelReady) {
+      p.noStroke();
+      p.fill(255, 255, 255, 200);
+      p.textSize(14);
+      p.textAlign(p.CENTER, p.CENTER);
+      p.text('Chargement…', p.width / 2, p.height / 2);
     }
-}
+  };
 
-function lancerManche() {
-    if (!jeuEnCours) return;
-    phaseJeu = "ECOUTE";
-    messageAction = "DITES VOTRE SOMME...";
-    ordiDoigts = floor(random(0, 6));
-    ordiSommeAnnoncee = floor(random(0, 11));
-    try { recognition.start(); } catch(e) {}
-}
+  p.windowResized = () => {
+    const container = $('canvas-container');
+    const w = container.offsetWidth;
+    const h = Math.round(w * 0.75);
+    p.resizeCanvas(w, h);
+    capture.size(w, h);
+  };
+};
 
-function verifierGagnant() {
-    let mesDoigts = hands.length > 0 ? countFingers(hands[0]) : 0;
-    let totalReel = mesDoigts + ordiDoigts;
-
-    let joueurGagne = (maSommeAnnoncee === totalReel);
-    let ordiGagne = (ordiSommeAnnoncee === totalReel);
-
-    if (joueurGagne && ordiGagne) {
-        scoreJoueur++; scoreOrdi++;
-        messageResultat = "ÉGALITÉ PARFAITE !";
-    } else if (joueurGagne) {
-        scoreJoueur++;
-        messageResultat = "VOUS MARQUEZ 1 POINT !";
-    } else if (ordiGagne) {
-        scoreOrdi++;
-        messageResultat = "L'ORDI MARQUE 1 POINT !";
-    } else {
-        messageResultat = "PERSONNE N'A TROUVÉ !";
-    }
-
-    messageAction = `Moi: ${mesDoigts} + Ordi: ${ordiDoigts} = ${totalReel}`;
-    phaseJeu = "RESULTAT";
-}
-
-function displayUI(mesDoigts) {
-    fill(0, 180);
-    noStroke();
-    rect(20, 20, 450, 200, 15);
-
-    fill(255);
-    textSize(22);
-    text("SCORES", 40, 55);
-    fill("#00ff88"); text("VOUS : " + scoreJoueur, 40, 90);
-    fill("#ff4444"); text("ORDI : " + scoreOrdi, 250, 90);
-
-    stroke(255, 50); line(40, 110, 430, 110); noStroke();
-
-    fill(255);
-    textSize(16);
-    if (phaseJeu === "ECOUTE") fill("#00CCFF");
-    text(messageAction, 40, 140);
-
-    if (phaseJeu === "RESULTAT") {
-        fill(255);
-        textSize(14);
-        text(`Annonces -> Moi: ${maSommeAnnoncee} | Ordi: ${ordiSommeAnnoncee}`, 40, 165);
-        textSize(24);
-        fill("#ffff00");
-        text(messageResultat, 40, 195);
-        fill(255, 100);
-        rect(40, 205, 100, 5);
-    }
-
-    fill(255, 150);
-    textSize(14);
-    text("Doigts : " + mesDoigts + " | Espace pour ON/OFF", 40, height - 30);
-
-    if (jeuEnCours && phaseJeu === "ECOUTE") {
-        fill("#ff0000");
-        ellipse(width - 40, 40, 20, 20);
-    }
-}
-
-function countFingers(hand) {
-    let count = 0;
-    for (let i = 0; i < fingerTips.length; i++) {
-        let tip = getKeypointsByName(hand, fingerTips[i]);
-        let pip = getKeypointsByName(hand, fingerPips[i]);
-        if (tip && pip && tip.y < pip.y) count++;
-    }
-    let thumbTip = getKeypointsByName(hand, "thumb_tip");
-    let thumbIp = getKeypointsByName(hand, "thumb_ip");
-    let pinkyMcp = getKeypointsByName(hand, "pinky_finger_mcp");
-    if (thumbTip && thumbIp && pinkyMcp) {
-        if (dist(thumbTip.x, thumbTip.y, pinkyMcp.x, pinkyMcp.y) > 80) count++;
-    }
-    return count;
-}
-
-function drawHandFeedback(hand, count) {
-    let wrist = getKeypointsByName(hand, "wrist");
-    if (wrist) {
-        fill(0, 255, 0);
-        ellipse(wrist.x, wrist.y, 20);
-        textSize(20);
-        fill(255);
-        text(count, wrist.x + 15, wrist.y);
-    }
-}
-
-function gotHands(results) { hands = results; }
-function getKeypointsByName(hand, name) { return hand.keypoints.find(kp => kp.name === name); }
-function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+// ── Initialisation ────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildAnnounceButtons();
+  updateScoreboard();
+  $('btn-play').addEventListener('click', playRound);
+  $('btn-reset').addEventListener('click', resetGame);
+  new p5(sketch);
+});
