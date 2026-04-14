@@ -1,5 +1,6 @@
 /* ============================================================
    morra.js  -  Jeu de la Morra (p5.js 1.11.3 + ml5.js 1.2.1)
+   API ml5 v1.x : handPose() dans preload(), detectStart() dans setup()
    ============================================================ */
 
 // ── Etat global ───────────────────────────────────────────────────────────────
@@ -102,18 +103,19 @@ function resetGame() {
   state.rounds = 0; state.selectedAnnounce = null;
   updateScoreboard();
   document.querySelectorAll('.btn-number').forEach(b => b.classList.remove('selected'));
-  $('disp-player').textContent = '-';
+  $('disp-player').textContent   = '-';
   $('disp-computer').textContent = '-';
   const box = $('result-box');
   box.className = 'result-box waiting';
-  box.innerHTML = '<div class="result-title">-</div><div class="result-detail">Choisissez votre annonce et jouez</div>';
+  box.innerHTML = '<div class="result-title">-</div>' +
+    '<div class="result-detail">Choisissez votre annonce et jouez</div>';
   $('btn-play').disabled = true;
 }
 
 // ── Sketch p5.js ──────────────────────────────────────────────────────────────
 const sketch = function(p) {
-  let capture, handpose;
-  let keypointsToRender = [];
+  let capture, handpose, hands = [];
+
   const statusEl   = $('status-bar');
   const detectedEl = $('detected-fingers');
 
@@ -126,44 +128,44 @@ const sketch = function(p) {
   ];
   const TIPS = [4, 8, 12, 16, 20];
 
+  // preload() : ml5 v1.x recommande de creer le modele ici
+  p.preload = function() {
+    handpose = ml5.handPose({ maxHands: 1 });
+  };
+
   p.setup = function() {
     const container = $('canvas-container');
     const w = container.offsetWidth || 480;
     const h = Math.round(w * 0.75);
     p.createCanvas(w, h).parent('canvas-container');
-    statusEl.textContent = 'Initialisation camera...';
 
-    // La camera d'abord, puis le modele dans le callback
-    capture = p.createCapture(p.VIDEO, function() {
-      statusEl.textContent = 'Chargement modele HandPose...';
+    capture = p.createCapture(p.VIDEO);
+    capture.size(w, h);
+    capture.hide();
 
-      // ml5 v1.2.1 : passer le callback comme 2e argument garantit
-      // que this.model est non-null quand on appelle detectLoop
-      ml5.handPose({ maxHands: 1 }, function(hp) {
-        handpose = hp;
+    statusEl.textContent = 'Demarrage de la detection...';
+
+    // detectStart() = la bonne methode ml5 v1.x pour une boucle continue
+    handpose.detectStart(capture, function(results) {
+      hands = results;
+
+      if (!state.modelReady) {
         statusEl.textContent = 'Modele pret - montrez votre main !';
         state.modelReady = true;
         checkCanPlay();
+      }
 
-        handpose.detectLoop(capture, function(results) {
-          if (results && results.length > 0) {
-            const hand = results[0];
-            keypointsToRender = hand.keypoints || hand.landmarks || [];
-            const fingers = countFingers(keypointsToRender);
-            state.playerFingers = fingers;
-            detectedEl.textContent = fingers;
-          } else {
-            keypointsToRender = [];
-            state.playerFingers = null;
-            detectedEl.textContent = '-';
-          }
-          checkCanPlay();
-        });
-      });
+      if (hands && hands.length > 0) {
+        const kps = hands[0].keypoints;
+        const fingers = countFingers(kps);
+        state.playerFingers = fingers;
+        detectedEl.textContent = fingers;
+      } else {
+        state.playerFingers    = null;
+        detectedEl.textContent = '-';
+      }
+      checkCanPlay();
     });
-
-    capture.size(w, h);
-    capture.hide();
   };
 
   p.draw = function() {
@@ -173,24 +175,30 @@ const sketch = function(p) {
       p.image(capture, 0, 0, p.width, p.height);
       p.pop();
     }
-    if (keypointsToRender.length > 0) {
-      p.stroke(91, 200, 245, 180); p.strokeWeight(2);
-      CONNECTIONS.forEach(([a, b]) => {
-        const ka = keypointsToRender[a], kb = keypointsToRender[b];
-        if (ka && kb) p.line(p.width - ka.x, ka.y, p.width - kb.x, kb.y);
-      });
-      keypointsToRender.forEach((kp, i) => {
-        if (!kp) return;
-        p.noStroke();
-        p.fill(TIPS.includes(i) ? '#e0c96e' : '#5bc8f5');
-        p.circle(p.width - kp.x, kp.y, TIPS.includes(i) ? 10 : 6);
-      });
-      if (state.playerFingers !== null) {
-        p.noStroke(); p.fill(0, 0, 0, 150);
-        p.rect(p.width - 76, 10, 66, 44, 10);
-        p.fill('#e0c96e'); p.textSize(28);
-        p.textAlign(p.CENTER, p.CENTER);
-        p.text(state.playerFingers, p.width - 43, 32);
+    if (hands && hands.length > 0) {
+      const kps = hands[0].keypoints;
+      if (kps && kps.length > 0) {
+        // Lignes du squelette
+        p.stroke(91, 200, 245, 180); p.strokeWeight(2);
+        CONNECTIONS.forEach(([a, b]) => {
+          const ka = kps[a], kb = kps[b];
+          if (ka && kb) p.line(p.width - ka.x, ka.y, p.width - kb.x, kb.y);
+        });
+        // Points
+        kps.forEach((kp, i) => {
+          if (!kp) return;
+          p.noStroke();
+          p.fill(TIPS.includes(i) ? '#e0c96e' : '#5bc8f5');
+          p.circle(p.width - kp.x, kp.y, TIPS.includes(i) ? 10 : 6);
+        });
+        // Badge nombre de doigts
+        if (state.playerFingers !== null) {
+          p.noStroke(); p.fill(0, 0, 0, 150);
+          p.rect(p.width - 76, 10, 66, 44, 10);
+          p.fill('#e0c96e'); p.textSize(28);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.text(state.playerFingers, p.width - 43, 32);
+        }
       }
     }
     if (!state.modelReady) {
